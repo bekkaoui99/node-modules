@@ -2,6 +2,8 @@ const fs = require("fs");
 const pdfPoppler = require("pdf-poppler");
 const officegen = require("officegen");
 const mammoth = require("mammoth");
+const ExcelJS = require("exceljs");
+const PDFLib = require("pdf-lib");
 
 // Function to convert PDF to Word
 async function convertPDFToWord(inputPath, outputPath) {
@@ -86,9 +88,64 @@ function convertPPTToPDF(inputPath, outputPath) {
   }
 }
 
+// Function to convert PDF to Excel
+async function convertPDFToExcel(inputPath, outputPath) {
+  try {
+    const images = await pdfPoppler.convert(inputPath, { format: "jpeg" });
+
+    // Create a new Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Sheet 1");
+
+    // Add images to the Excel worksheet
+    for (let i = 0; i < images.length; i++) {
+      const imageBuffer = fs.readFileSync(images[i]);
+      worksheet.addImage(imageBuffer, `A${i + 1}`);
+    }
+
+    // Save the Excel file
+    await workbook.xlsx.writeFile(outputPath);
+
+    console.log("PDF to Excel conversion successful.");
+  } catch (error) {
+    console.error("Error converting PDF to Excel:", error.message);
+  }
+}
+
+// Function to convert Excel to PDF
+async function convertExcelToPDF(inputPath, outputPath) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(inputPath);
+
+    // Create a PDF document
+    const pdfDoc = await PDFLib.PDFDocument.create();
+    const pdfPages = await pdfDoc.embedPdf(await workbook.xlsx.writeBuffer());
+
+    // Create a new PDF with the embedded Excel content
+    const pdfBytes = await PDFLib.PDFDocument.create();
+    const [page] = await pdfBytes.addPage([pdfPages.width, pdfPages.height]);
+    page.drawImage(pdfPages, {
+      x: 0,
+      y: 0,
+      width: pdfPages.width,
+      height: pdfPages.height,
+    });
+
+    // Save the PDF file
+    fs.writeFileSync(outputPath, await pdfBytes.save());
+
+    console.log("Excel to PDF conversion successful.");
+  } catch (error) {
+    console.error("Error converting Excel to PDF:", error.message);
+  }
+}
+
 module.exports = {
   convertPDFToWord,
   convertWordToPDF,
   convertPDFToPPT,
   convertPPTToPDF,
+  convertExcelToPDF,
+  convertPDFToExcel,
 };
